@@ -14,6 +14,11 @@ import { type RawData, WebSocket } from 'ws';
 import { z } from 'zod';
 
 import { ChatExecutionManager } from './chat-execution-manager';
+
+// Augment WebSocket type for heartbeat functionality
+interface WebSocketWithHeartbeat extends WebSocket {
+	isAlive: boolean;
+}
 import {
 	chatMessageSchema,
 	type ChatMessage,
@@ -98,7 +103,8 @@ export class ChatService {
 			return;
 		}
 
-		ws.isAlive = true;
+		const wsWithHeartbeat = ws as WebSocketWithHeartbeat;
+		wsWithHeartbeat.isAlive = true;
 
 		const key = `${sessionId}|${executionId}|${isPublic ? 'public' : 'integrated'}`;
 

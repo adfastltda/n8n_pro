@@ -7,6 +7,12 @@ import { jsonStringify, sleep, UserError } from 'n8n-workflow';
 import type WebSocket from 'ws';
 
 import { WsStatusCodes } from '@/constants';
+
+// Augment WebSocket type for heartbeat functionality
+interface WebSocketWithHeartbeat extends WebSocket {
+	isAlive: boolean;
+}
+
 import { DefaultTaskRunnerDisconnectAnalyzer } from '@/task-runners/default-task-runner-disconnect-analyzer';
 import type {
 	DisconnectAnalyzer,
@@ -18,7 +24,7 @@ import { TaskRunnerLifecycleEvents } from '@/task-runners/task-runner-lifecycle-
 
 import { TaskBroker, type MessageCallback, type TaskRunner } from './task-broker.service';
 
-function heartbeat(this: WebSocket) {
+function heartbeat(this: WebSocketWithHeartbeat) {
 	this.isAlive = true;
 }
 
@@ -56,7 +62,8 @@ export class TaskBrokerWsServer {
 
 		this.heartbeatTimer = setInterval(() => {
 			for (const [runnerId, connection] of this.runnerConnections.entries()) {
-				if (!connection.isAlive) {
+				const conn = connection as WebSocketWithHeartbeat;
+				if (!conn.isAlive) {
 					void this.removeConnection(
 						runnerId,
 						'failed-heartbeat-check',
@@ -65,7 +72,7 @@ export class TaskBrokerWsServer {
 					this.runnerLifecycleEvents.emit('runner:failed-heartbeat-check');
 					return;
 				}
-				connection.isAlive = false;
+				conn.isAlive = false;
 				connection.ping();
 			}
 		}, heartbeatInterval * Time.seconds.toMilliseconds);
@@ -93,8 +100,9 @@ export class TaskBrokerWsServer {
 	}
 
 	add(id: TaskRunner['id'], connection: WebSocket) {
-		connection.isAlive = true;
-		connection.on('pong', heartbeat);
+		const conn = connection as WebSocketWithHeartbeat;
+		conn.isAlive = true;
+		connection.on('pong', heartbeat as (this: WebSocket) => void);
 
 		let isConnected = false;
 

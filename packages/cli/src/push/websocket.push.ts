@@ -6,15 +6,21 @@ import type WebSocket from 'ws';
 
 import { AbstractPush } from './abstract.push';
 
-function heartbeat(this: WebSocket) {
+// Augment WebSocket type for heartbeat functionality
+interface WebSocketWithHeartbeat extends WebSocket {
+	isAlive: boolean;
+}
+
+function heartbeat(this: WebSocketWithHeartbeat) {
 	this.isAlive = true;
 }
 
 @Service()
 export class WebSocketPush extends AbstractPush<WebSocket> {
 	add(pushRef: string, userId: User['id'], connection: WebSocket) {
-		connection.isAlive = true;
-		connection.on('pong', heartbeat);
+		const ws = connection as WebSocketWithHeartbeat;
+		ws.isAlive = true;
+		ws.on('pong', heartbeat as (this: WebSocket) => void);
 
 		super.add(pushRef, userId, connection);
 
@@ -78,10 +84,11 @@ export class WebSocketPush extends AbstractPush<WebSocket> {
 
 	protected ping(connection: WebSocket): void {
 		// If a connection did not respond with a `PONG` in the last 60 seconds, disconnect
-		if (!connection.isAlive) {
+		const ws = connection as WebSocketWithHeartbeat;
+		if (!ws.isAlive) {
 			return connection.terminate();
 		}
-		connection.isAlive = false;
+		ws.isAlive = false;
 		connection.ping();
 	}
 
