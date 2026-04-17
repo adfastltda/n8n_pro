@@ -6,7 +6,8 @@ pnpm --filter=@n8n/codemirror-lang-html run grammar:build
 
 # 3. Buildar a aplicação
 pnpm build:n8n
-$version="2.16.1"
+
+version="2.16.1"
 docker build \
   -t ghcr.io/adfastltda/n8n_pro/n8n:$version \
   -t ghcr.io/adfastltda/n8n_pro/n8n:latest \
