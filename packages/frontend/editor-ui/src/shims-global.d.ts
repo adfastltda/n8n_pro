@@ -44,6 +44,7 @@ declare global {
 			NODE_ENV: 'development' | 'production';
 			VUE_APP_URL_BASE_API: string;
 			VUE_SCAN: boolean;
+			VITE_DEV_LICENSE_BYPASS?: string;
 		};
 	}
 

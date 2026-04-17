@@ -229,7 +229,7 @@ export default mergeConfig(
 		plugins,
 		resolve: { alias },
 		base: publicPath,
-		envPrefix: ['VUE', 'N8N_ENV_FEAT'],
+		envPrefix: ['VUE', 'N8N_ENV_FEAT', 'VITE'],
 		css: {
 			preprocessorMaxWorkers: true,
 			preprocessorOptions: {

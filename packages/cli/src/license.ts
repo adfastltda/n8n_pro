@@ -54,6 +54,66 @@ export class License implements LicenseProvider {
 		forceRecreate = false,
 		isCli = false,
 	}: { forceRecreate?: boolean; isCli?: boolean } = {}) {
+		// Only enable the dev bypass when explicitly configured via env var or running in development mode.
+		// Avoid accidental enabling of enterprise features in production.
+		const DEV_LICENSE_BYPASS =
+			process.env.N8N_DEV_LICENSE_BYPASS === 'true' || process.env.NODE_ENV === 'development';
+
+		if (DEV_LICENSE_BYPASS) {
+			this.logger.warn('DEV MODE: License manager bypassed. All enterprise features ENABLED.');
+
+			// Create a fake manager with full entitlements
+			const fakeEntitlements: any[] = [
+				{
+					productId: 'n8n-enterprise',
+					productMetadata: {
+						planName: 'Enterprise',
+						terms: { isMainPlan: true },
+					},
+					validFrom: new Date(),
+					validTo: new Date('2099-12-31'),
+					features: Object.fromEntries(Object.keys(LICENSE_FEATURES).map((f) => [f, true])),
+					quotas: {
+						[LICENSE_QUOTAS.USERS_LIMIT]: UNLIMITED_LICENSE_QUOTA,
+						[LICENSE_QUOTAS.TRIGGER_LIMIT]: UNLIMITED_LICENSE_QUOTA,
+						[LICENSE_QUOTAS.VARIABLES_LIMIT]: UNLIMITED_LICENSE_QUOTA,
+						[LICENSE_QUOTAS.AI_CREDITS]: 99999999,
+						[LICENSE_QUOTAS.WORKFLOW_HISTORY_PRUNE_LIMIT]: UNLIMITED_LICENSE_QUOTA,
+						[LICENSE_QUOTAS.TEAM_PROJECT_LIMIT]: UNLIMITED_LICENSE_QUOTA,
+					},
+				},
+			];
+
+			// @ts-ignore — we're faking the whole SDK
+			this.manager = {
+				hasFeatureEnabled: () => true,
+				getFeatureValue: (feature: string) => {
+					if (feature === 'planName') return 'Enterprise';
+					if (feature === 'enterprise') return true;
+					if (Object.values(LICENSE_QUOTAS).includes(feature as any)) {
+						return UNLIMITED_LICENSE_QUOTA;
+					}
+					return true;
+				},
+				getCurrentEntitlements: () => fakeEntitlements,
+				getManagementJwt: () => 'dev-jwt-fake',
+				getConsumerId: () => 'dev-consumer-id',
+				toString: () => 'DEV UNLOCKED: Enterprise (unlimited)',
+				activate: async () => {},
+				renew: async () => {},
+				reload: async () => {},
+				clear: async () => {},
+				shutdown: async () => {},
+				enableAutoRenewals: () => {},
+				disableAutoRenewals: () => {},
+				initialize: async () => {},
+			} as any;
+
+			this.logger.debug('Fake license manager initialized');
+			return;
+		}
+
+		// Real license manager initialization (when bypass is NOT enabled)
 		if (this.manager && !forceRecreate) {
 			this.logger.warn('License manager already initialized or shutting down');
 			return;
@@ -134,7 +194,7 @@ export class License implements LicenseProvider {
 		if (ephemeralLicense) {
 			return ephemeralLicense;
 		}
-		const databaseSettings = await this.settingsRepository.findOne({
+		const databaseSettings = await (this.settingsRepository as any).findOne({
 			where: {
 				key: SETTINGS_LICENSE_CERT_KEY,
 			},
@@ -163,7 +223,7 @@ export class License implements LicenseProvider {
 	async saveCertStr(value: TLicenseBlock): Promise<void> {
 		// if we have an ephemeral license, we don't want to save it to the database
 		if (this.globalConfig.license.cert) return;
-		await this.settingsRepository.upsert(
+		await (this.settingsRepository as any).upsert(
 			{
 				key: SETTINGS_LICENSE_CERT_KEY,
 				value,

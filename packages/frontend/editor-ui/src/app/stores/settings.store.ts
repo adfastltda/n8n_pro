@@ -64,7 +64,15 @@ export const useSettingsStore = defineStore(STORES.SETTINGS, () => {
 		secureCookie: settings.value.authCookie.secure,
 	}));
 
-	const isEnterpriseFeatureEnabled = computed(() => settings.value.enterprise ?? {});
+	const isEnterpriseFeatureEnabled = computed(() => {
+		// DEV LICENSE BYPASS: Return all enterprise features enabled
+		const devBypass =
+			import.meta.env.VITE_DEV_LICENSE_BYPASS === 'true' || import.meta.env.MODE === 'development';
+		if (devBypass) {
+			return new Proxy({}, { get: () => true });
+		}
+		return settings.value.enterprise ?? {};
+	});
 
 	const nodeJsVersion = computed(() => settings.value.nodeJsVersion);
 
